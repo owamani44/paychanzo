@@ -34,10 +34,20 @@ public class Business {
     @Enumerated(EnumType.STRING)
     private AccountStatus status;
 
-    @CreatedDate
+
     @Column(name = "created_at")
     private Instant createdAt;
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate(){
+        this.updatedAt = Instant.now();
+    }
 }

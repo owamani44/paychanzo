@@ -1,6 +1,7 @@
 package com.api.paychanzo.business.repo;
 
 import com.api.paychanzo.business.entity.Business;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -8,4 +9,9 @@ import java.util.UUID;
 
 @Repository
 public interface BusinessRepo extends JpaRepository<Business, UUID> {
+    boolean existsByPhoneNumber(String phoneNumber);
+
+    boolean existsByEmailIgnoreCase( String email);
+
+    boolean existsByBusinessCodeIgnoreCase(String businessCode);
 }
