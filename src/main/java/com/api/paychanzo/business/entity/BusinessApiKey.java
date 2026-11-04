@@ -21,9 +21,6 @@ public class BusinessApiKey {
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 
-    @Column(name = "key_name")
-    private String keyName;
-
     @Column(name = "key_prefix")
     private String keyPrefix;
 
@@ -39,5 +36,10 @@ public class BusinessApiKey {
 
     @Column(name = "created_at")
     private Instant createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = Instant.now();
+    }
 
 }
