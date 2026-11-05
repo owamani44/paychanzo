@@ -1,24 +1,25 @@
 package com.api.paychanzo.business.service;
 
-import com.api.paychanzo.business.dto.ApiKeyDTO;
+
 import com.api.paychanzo.business.entity.AccountStatus;
 import com.api.paychanzo.business.entity.ApiKeyStatus;
 import com.api.paychanzo.business.entity.Business;
 import com.api.paychanzo.business.entity.BusinessApiKey;
 import com.api.paychanzo.business.repo.BusinessApiKeyRepo;
+import com.api.paychanzo.business.repo.BusinessRepo;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.authentication.BadCredentialsException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -30,9 +31,9 @@ public class BusinessApiKeyService {
 
 
     private final BusinessApiKeyRepo apiKeyRepo;
+    private final BusinessRepo businessRepo;
     private final EntityManager entityManager;
 
-    String ApiKey;
 
     private String generateSecret() {
 
@@ -67,31 +68,77 @@ public class BusinessApiKeyService {
 
     public String createApiKey(UUID businessId){
 
-        BusinessApiKey ak = apiKeyRepo.findByIdWithBusiness(businessId).orElseThrow(
+        Business business = businessRepo.findById(businessId).orElseThrow(
                 ()->new EntityNotFoundException("Business not found")
         );
 
-        Business business = ak.getBusiness();
+
 
         if (business.getStatus() != AccountStatus.ACTIVE) {
             throw new IllegalStateException("Action denied: Business account is " + business.getStatus());
         }
 
-        Instant oneYearFromNow = ZonedDateTime.now(ZoneOffset.UTC)
-                .plusYears(1)
-                .toInstant();
+        Instant expiresAt = Instant.now().plus(365, ChronoUnit.DAYS);
 
-        String keyPrefix = "PCZ0";
+        String keyPrefix = "pczo_live_"+ UUID.randomUUID();
         String secret = generateSecret();
-        ApiKey= keyPrefix+secret;
+        String RawApiKey= keyPrefix+"."+secret;
         String hashedSecret = hashSecret(secret);
 
-        ak.setBusiness(entityManager.getReference(Business.class,  businessId ));
-        ak.setKeyPrefix(keyPrefix);
-        ak.setSecretHash(hashedSecret);
-        ak.setStatus(ApiKeyStatus.ACTIVE);
-        ak.setExpiresAt(oneYearFromNow);
-        apiKeyRepo.save(ak);
-        return ApiKey;
+        BusinessApiKey apiKey = new BusinessApiKey();
+
+        apiKey.setBusiness(business);
+        apiKey.setKeyPrefix(keyPrefix);
+        apiKey.setSecretHash(hashedSecret);
+        apiKey.setStatus(ApiKeyStatus.ACTIVE);
+        apiKey.setLastUsedAt(Instant.now());
+        apiKey.setExpiresAt(expiresAt);
+
+        apiKeyRepo.save(apiKey);
+
+        return RawApiKey;
+    }
+
+    @Transactional
+    public BusinessApiKey validateApiKey(
+            String keyPrefix,
+            String secret
+    ) {
+
+        // 1. Find API key
+        BusinessApiKey apiKey = apiKeyRepo.findByKeyPrefix(keyPrefix)
+                .orElseThrow(() ->
+                        new BadCredentialsException("Invalid API key")
+                );
+
+        // 2. Check status
+        if (apiKey.getStatus() != ApiKeyStatus.ACTIVE) {
+            throw new BadCredentialsException("Invalid API key");
+        }
+
+        // 3. Check expiration
+        if (apiKey.getExpiresAt() == null ||
+                !apiKey.getExpiresAt().isAfter(Instant.now())) {
+
+            throw new BadCredentialsException("Invalid API key");
+        }
+
+        // 4. Hash supplied secret
+        String suppliedHash = hashSecret(secret);
+
+        // 5. Compare hashes
+        boolean matches = MessageDigest.isEqual(
+                HexFormat.of().parseHex(suppliedHash),
+                HexFormat.of().parseHex(apiKey.getSecretHash())
+        );
+
+        if (!matches) {
+            throw new BadCredentialsException("Invalid API key");
+        }
+
+        // 6. Update last used
+        apiKey.setLastUsedAt(Instant.now());
+
+        return apiKey;
     }
 }

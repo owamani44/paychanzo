@@ -17,4 +17,10 @@ public interface BusinessApiKeyRepo extends JpaRepository<BusinessApiKey, UUID> 
     @Query("SELECT k FROM BusinessApiKey k JOIN FETCH k.business WHERE k.id = :id")
     Optional<BusinessApiKey> findByIdWithBusiness(@Param("id") UUID businessId);
 
+    @Query("""
+    SELECT k FROM BusinessApiKey k
+    JOIN FETCH k.business
+    WHERE k.keyPrefix = :keyPrefix
+    """)
+    Optional<BusinessApiKey> findByKeyPrefix(@Param("keyPrefix") String keyPrefix);
 }

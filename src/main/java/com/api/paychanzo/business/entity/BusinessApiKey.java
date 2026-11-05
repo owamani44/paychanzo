@@ -34,6 +34,9 @@ public class BusinessApiKey {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "last_used_at")
+    private Instant lastUsedAt;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
