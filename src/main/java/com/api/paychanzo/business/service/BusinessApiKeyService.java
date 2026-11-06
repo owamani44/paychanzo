@@ -66,23 +66,33 @@ public class BusinessApiKeyService {
         }
     }
 
+    @Transactional
     public String createApiKey(UUID businessId){
 
+        //find business
         Business business = businessRepo.findById(businessId).orElseThrow(
                 ()->new EntityNotFoundException("Business not found")
         );
 
 
-
+        //validate business status
         if (business.getStatus() != AccountStatus.ACTIVE) {
             throw new IllegalStateException("Action denied: Business account is " + business.getStatus());
         }
 
+        //set expiry time
         Instant expiresAt = Instant.now().plus(365, ChronoUnit.DAYS);
 
+        //generate keyPrefix
         String keyPrefix = "pczo_live_"+ UUID.randomUUID();
+
+        //generate secret
         String secret = generateSecret();
+
+        //create the api key
         String RawApiKey= keyPrefix+"."+secret;
+
+        //hashing the secret
         String hashedSecret = hashSecret(secret);
 
         BusinessApiKey apiKey = new BusinessApiKey();
@@ -94,6 +104,7 @@ public class BusinessApiKeyService {
         apiKey.setLastUsedAt(Instant.now());
         apiKey.setExpiresAt(expiresAt);
 
+        //save the api key entity
         apiKeyRepo.save(apiKey);
 
         return RawApiKey;
@@ -140,5 +151,10 @@ public class BusinessApiKeyService {
         apiKey.setLastUsedAt(Instant.now());
 
         return apiKey;
+    }
+
+
+    public void revokeApiKey(UUID id){
+
     }
 }
