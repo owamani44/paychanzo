@@ -155,6 +155,16 @@ public class BusinessApiKeyService {
 
 
     public void revokeApiKey(UUID id){
+        BusinessApiKey key = apiKeyRepo.findById(id).
+                orElseThrow(()->new EntityNotFoundException("Api Key not found"));
 
+        key.setStatus(ApiKeyStatus.REVOKED);
+        apiKeyRepo.save(key);
     }
+
+    public String rotateKey(){
+        return "";
+    }
+
+
 }
